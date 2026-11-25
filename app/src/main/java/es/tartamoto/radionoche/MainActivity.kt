@@ -117,6 +117,7 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         Scheduler.schedule(this)
+        Prefs.deleteOld(this)
         refreshLists()
         handler.post(ticker)
     }

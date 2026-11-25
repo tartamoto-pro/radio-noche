@@ -70,6 +70,7 @@ class RecordService : Service() {
         val name = "COPE_" + SimpleDateFormat("yyyy-MM-dd_HHmm", Locale.US).format(Date()) + ".mp3"
         val file = File(Prefs.recDir(this), name)
         activeFile = file
+        cleanup()
 
         val pm = getSystemService(PowerManager::class.java)
         wake = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "radionoche:grabar").apply {
@@ -163,7 +164,6 @@ class RecordService : Service() {
         } finally {
             recording = false
             status = ""
-            cleanup()
             Scheduler.schedule(this)
             try { wake?.release() } catch (_: Exception) {}
             try { wifi?.release() } catch (_: Exception) {}
@@ -204,10 +204,13 @@ class RecordService : Service() {
         return conn
     }
 
-    /** Borra grabaciones de más de 7 días (deja siempre las 3 últimas). */
+    /** Al empezar una grabación nueva, la anterior ya no interesa. */
     private fun cleanup() {
-        val limit = System.currentTimeMillis() - 7L * 24 * 3600 * 1000
-        Prefs.recordings(this).drop(3).filter { it.lastModified() < limit }.forEach { it.delete() }
+        val active = activeFile?.absolutePath
+        Prefs.recordings(this).filter { it.absolutePath != active }.forEach { f ->
+            Prefs.sp(this).edit().remove("pos_${f.name}").remove("bps_${f.name}").apply()
+            f.delete()
+        }
     }
 
     override fun onDestroy() {

@@ -32,13 +32,9 @@ object Prefs {
     fun sp(c: Context): SharedPreferences =
         c.getSharedPreferences("radio_noche", Context.MODE_PRIVATE)
 
-    private fun defaultSlot(dow: Int): Slot = when (dow) {
-        // El Partidazo: lunes a viernes 23:30 - 01:30
-        Calendar.MONDAY, Calendar.TUESDAY, Calendar.WEDNESDAY,
-        Calendar.THURSDAY, Calendar.FRIDAY -> Slot(true, 23 * 60 + 30, 120)
-        // Tiempo de Juego (tramo de noche) + tertulia: 22:00 - 01:30
-        else -> Slot(true, 22 * 60, 210)
-    }
+    /** Todos los días 23:30 - 01:30. */
+    @Suppress("UNUSED_PARAMETER")
+    private fun defaultSlot(dow: Int): Slot = Slot(true, 23 * 60 + 30, 120)
 
     fun slot(c: Context, dow: Int): Slot {
         val p = sp(c)
@@ -84,6 +80,31 @@ object Prefs {
     fun bps(c: Context, name: String): Int = sp(c).getInt("bps_$name", 16000)
     fun setBps(c: Context, name: String, v: Int) {
         if (v in 4000..64000) sp(c).edit().putInt("bps_$name", v).apply()
+    }
+
+    /**
+     * Borra las grabaciones viejas: solo interesan la de esa noche.
+     * Se borra todo lo que empezó hace más de 18 horas (y nunca la que se está grabando).
+     */
+    fun deleteOld(c: Context) {
+        val limit = System.currentTimeMillis() - 18L * 3600 * 1000
+        val active = RecordService.activeFile?.absolutePath
+        recordings(c).forEach { f ->
+            if (f.absolutePath != active && startOf(f) < limit) {
+                sp(c).edit().remove("pos_${f.name}").remove("bps_${f.name}").apply()
+                f.delete()
+            }
+        }
+    }
+
+    /** Hora de inicio sacada del nombre del archivo. */
+    fun startOf(f: File): Long {
+        val m = Regex("""(\d{4})-(\d{2})-(\d{2})_(\d{2})(\d{2})""").find(f.name) ?: return f.lastModified()
+        val (y, mo, d, h, mi) = m.destructured
+        return Calendar.getInstance().apply {
+            set(y.toInt(), mo.toInt() - 1, d.toInt(), h.toInt(), mi.toInt(), 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
     }
 
     fun recordedMs(c: Context, f: File): Long = f.length() * 1000L / bps(c, f.name)
