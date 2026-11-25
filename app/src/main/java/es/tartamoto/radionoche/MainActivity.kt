@@ -82,9 +82,15 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = BG
-        window.navigationBarColor = BG
-        setContentView(buildUi())
+        val root = buildUi()
+        // Android 15 dibuja bajo la barra de estado: dejar hueco arriba y abajo
+        root.setOnApplyWindowInsetsListener { v, insets ->
+            val bars = androidx.core.view.WindowInsetsCompat.toWindowInsetsCompat(insets, v)
+                .getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+            v.setPadding(0, bars.top, 0, bars.bottom)
+            insets
+        }
+        setContentView(root)
 
         if (Build.VERSION.SDK_INT >= 33 &&
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
